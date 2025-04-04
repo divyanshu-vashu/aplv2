@@ -24,8 +24,8 @@ interface LoginStore {
 }
 
 const DEFAULT_ADMIN: User = {
-  username: 'admin',
-  password: 'ram108',
+  username: process.env.ADMIN_USERNAME || 'admin',
+  password: process.env.ADMIN_PASSWORD || 'ram108',
   role: 'admin'
 };
 
