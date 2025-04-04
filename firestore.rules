@@ -1,0 +1,46 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Match any document in the 'matches' collection
+    match /matches/{matchId} {
+      allow read: if true; // Public can view matches
+      allow write: if isAdmin(); // Only admins can modify matches
+    }
+
+    // Players collection rules
+    match /players/{playerId} {
+      allow read: if true; // Public can view players
+      allow write: if isAdmin(); // Only admins can modify players
+    }
+
+    // Teams collection rules
+    match /teams/{teamId} {
+      allow read: if true; // Public can view teams
+      allow write: if isAdmin(); // Only admins can modify teams
+    }
+
+    // Leagues collection rules
+    match /leagues/{leagueId} {
+      allow read: if true; // Public can view leagues
+      allow write: if isAdmin(); // Only admins can modify leagues
+    }
+
+    // Users collection rules
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+  }
+}
