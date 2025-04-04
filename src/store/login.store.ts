@@ -25,7 +25,7 @@ interface LoginStore {
 
 const DEFAULT_ADMIN: User = {
   username: process.env.ADMIN_USERNAME || 'admin',
-  password: process.env.ADMIN_PASSWORD || 'ram108',
+  password: process.env.ADMIN_PASSWORD || 'macbook',
   role: 'admin'
 };
 
