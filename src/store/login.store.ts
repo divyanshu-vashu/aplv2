@@ -24,8 +24,8 @@ interface LoginStore {
 }
 
 const DEFAULT_ADMIN: User = {
-  username: process.env.ADMIN_USERNAME || 'admin',
-  password: process.env.ADMIN_PASSWORD || 'macbook',
+  username: import.meta.env.VITE_ADMIN_USERNAME || 'admin',
+  password: import.meta.env.VITE_ADMIN_PASSWORD || 'macbook',
   role: 'admin'
 };
 
