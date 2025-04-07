@@ -6,7 +6,7 @@ interface ScoreboardProps {
   match: Match;
   onClose: () => void;
 }
-
+let selectedBatsman2 ='';
 const Scoreboard: React.FC<ScoreboardProps> = ({ match, onClose }) => {
   const { updateScore, completeMatch, updatePlayerStats, leagues, fetchMatchById } = useAppStore();
 
@@ -192,10 +192,42 @@ const [dismissalFielder, setDismissalFielder] = useState<string>('');
 
 
 
-// Modify handleWicket to show popup instead of immediate update
-const handleWicket = () => {
+const handleWicket = async () => {
   if (!selectedBatsman || !validateTeamPlayers()) return;
-  setShowWicketPopup(true);
+  
+  // Update batsman stats based on dismissal type
+  const currentBatsmanStats = (currentTeam === 'teamA' ? match.teamABatting : match.teamBBatting)
+    ?.find(stats => stats.playerId === selectedBatsman) || {
+    runs: 0,
+    ballsFaced: 0,
+    fours: 0,
+    sixes: 0
+  };
+  
+  const batsmanStats: Partial<PlayerMatchStatsWithBatting> = {
+    ...currentBatsmanStats,
+    playerId: selectedBatsman || '',
+    matchId: match.id,
+    runs: currentBatsmanStats.runs || 0,
+    ballsFaced: (currentBatsmanStats.ballsFaced || 0) + 1, // Increment ball count
+    isNotOut: false,
+    fours: currentBatsmanStats.fours || 0,
+    sixes: currentBatsmanStats.sixes || 0,
+    strikeRate: ((currentBatsmanStats.runs || 0) / ((currentBatsmanStats.ballsFaced || 0) + 1)) * 100,
+    };
+
+    selectedBatsman2 = selectedBatsman ;
+
+  try {
+    await updatePlayerStats(
+      match.id,
+      batsmanStats,
+      currentTeam === 'teamA' ? 'teamABatting' : 'teamBBatting'
+    );
+    setShowWicketPopup(true);
+  } catch (error) {
+    console.error('Error updating batsman stats:', error);
+  }
 };
 
 // Add WicketPopup component inside Scoreboard component
@@ -217,36 +249,76 @@ const WicketPopup = () => {
       // Update score in Firestore
       await updateScore(match.id, currentTeam, newScore);
 
-      // Update batsman stats based on dismissal type
       const batsmanStats: Partial<PlayerMatchStatsWithBatting> = {
-        playerId: selectedBatsman,
-        matchId: match.id,
-        ballsFaced: 1,
-        dismissalType,
-        dismissalBowler: ['bowled', 'lbw', 'caught'].includes(dismissalType) ? selectedBowler : undefined,
-        dismissalFielder: ['caught', 'runOut', 'stumped'].includes(dismissalType) ? dismissalFielder : undefined
+        playerId: selectedBatsman2 || '',
+        dismissalType: dismissalType as 'bowled' | 'caught' | 'lbw' | 'runOut' | 'stumped' | 'hitWicket' | 'retired' | 'notOut',
+        dismissalBowler: ['bowled', 'lbw', 'caught'].includes(dismissalType) ? selectedBowler || '' : '',
+        dismissalFielder: ['caught', 'runOut', 'stumped'].includes(dismissalType) ? dismissalFielder || '' : ''
       };
-
-      // Only update bowler stats for bowler-involved dismissals
-      if (['bowled', 'lbw', 'caught'].includes(dismissalType)) {
-        const bowlerStats: Partial<PlayerMatchStatsWithBowling> = {
-          playerId: selectedBowler,
-          matchId: match.id,
-          wickets: 1,
-          bowlingBalls: 1
-        };
-        await updatePlayerStats(
-          match.id,
-          bowlerStats,
-          currentTeam === 'teamA' ? 'teamBBowling' : 'teamABowling'
-        );
-      }
-
       await updatePlayerStats(
         match.id,
         batsmanStats,
         currentTeam === 'teamA' ? 'teamABatting' : 'teamBBatting'
       );
+      
+
+      // Only update bowler stats for bowler-involved dismissals
+      if (['bowled', 'lbw', 'caught'].includes(dismissalType) && selectedBowler) {
+        const currentBowlerStats = (currentTeam === 'teamA' ? match.teamBBowling : match.teamABowling)
+          ?.find(stats => stats.playerId === selectedBowler) || {
+          bowlingBalls: 0,
+          runsConceded: 0,
+          wickets: 0,
+          dots: 0
+        };
+      
+        const bowlerStats: Partial<PlayerMatchStatsWithBowling> = {
+          ...currentBowlerStats,
+          playerId: selectedBowler,
+          matchId: match.id,
+          wickets: (currentBowlerStats.wickets || 0) + 1,
+          bowlingBalls: (currentBowlerStats.bowlingBalls || 0) + 1,
+          runsConceded: currentBowlerStats.runsConceded || 0,
+          economy: ((currentBowlerStats.runsConceded || 0) / (((currentBowlerStats.bowlingBalls || 0) + 1) / 6))
+        };
+      
+        await updatePlayerStats(
+          match.id,
+          bowlerStats,
+          currentTeam === 'teamA' ? 'teamBBowling' : 'teamABowling'
+        );
+
+        
+      } else {
+        // If dismissal type is not bowled, lbw, or caught, update batsman stats without bowler stats
+        const currentBowlerStats = (currentTeam === 'teamA' ? match.teamBBowling : match.teamABowling)
+          ?.find(stats => stats.playerId === selectedBowler) || {
+          bowlingBalls: 0,
+          runsConceded: 0,
+          wickets: 0,
+          dots: 0
+        };
+        const bowlerStats: Partial<PlayerMatchStatsWithBowling> = {
+          ...currentBowlerStats,
+          playerId: selectedBowler || undefined,
+          matchId: match.id,
+          wickets: (currentBowlerStats.wickets || 0) ,
+          bowlingBalls: (currentBowlerStats.bowlingBalls || 0) + 1,
+          runsConceded: currentBowlerStats.runsConceded || 0,
+          economy: ((currentBowlerStats.runsConceded || 0) / (((currentBowlerStats.bowlingBalls || 0) + 1) / 6))
+        };
+
+        await updatePlayerStats(
+          match.id,
+          bowlerStats,
+          currentTeam === 'teamA' ? 'teamBBowling' : 'teamABowling'
+        );
+        
+      }
+
+      
+
+     
 
       setSelectedBatsman(null);
       setShowWicketPopup(false);
